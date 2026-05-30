@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UK Crime Analysis Dashboard · 2012–2024</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0D0F14;
+  --surface:#13161E;
+  --surface2:#1A1E2A;
+  --border:#252A38;
+  --accent:#C4B5D9;
+  --accent2:#9B88BE;
+  --accent3:#6B5A9A;
+  --beige:#F5F0E8;
+  --beige-dim:#C8C0B0;
+  --red:#E05A5A;
+  --amber:#E0A040;
+  --green:#5ABE8A;
+  --blue:#5A9BE0;
+  --text:#EEE8DC;
+  --text-dim:#8A8278;
+  --mono:'Space Mono',monospace;
+  --display:'Syne',sans-serif;
+}
+html{scroll-behavior:smooth}
+body{
+  font-family:var(--display);
+  background:var(--bg);
+  color:var(--text);
+  min-height:100vh;
+  overflow-x:hidden;
+}
+
+/* GRID NOISE TEXTURE */
+body::before{
+  content:'';
+  position:fixed;inset:0;
+  background-image:
+    radial-gradient(ellipse 80% 50% at 20% 10%, rgba(107,90,154,0.08) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 80% 80%, rgba(196,181,217,0.05) 0%, transparent 50%);
+  pointer-events:none;z-index:0;
+}
+
+/* HEADER */
+header{
+  padding:2rem 2.5rem 1.5rem;
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:flex-start;justify-content:space-between;
+  flex-wrap:wrap;gap:1rem;
+  position:relative;z-index:1;
+  animation:fadeDown 0.6s ease both;
+}
+.header-left{}
+.header-tag{
+  font-family:var(--mono);
+  font-size:0.68rem;letter-spacing:0.15em;
+  color:var(--accent2);
+  text-transform:uppercase;
+  margin-bottom:0.5rem;
+}
+h1{
+  font-size:clamp(1.6rem,3vw,2.4rem);
+  font-weight:800;
+  line-height:1.1;
+  color:var(--beige);
+}
+h1 span{color:var(--accent)}
+.header-meta{
+  display:flex;flex-direction:column;align-items:flex-end;gap:0.4rem;
+  font-family:var(--mono);font-size:0.7rem;color:var(--text-dim);
+}
+.live-dot{
+  display:inline-flex;align-items:center;gap:0.4rem;
+  color:var(--green);font-size:0.7rem;
+}
+.live-dot::before{
+  content:'';width:6px;height:6px;border-radius:50%;
+  background:var(--green);
+  animation:pulse 2s infinite;
+}
+
+/* KPI STRIP */
+.kpi-strip{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  border-bottom:1px solid var(--border);
+  position:relative;z-index:1;
+  animation:fadeUp 0.7s 0.1s ease both;
+}
+.kpi{
+  padding:1.5rem 2rem;
+  border-right:1px solid var(--border);
+  transition:background 0.2s;
+}
+.kpi:last-child{border-right:none}
+.kpi:hover{background:var(--surface)}
+.kpi-label{
+  font-family:var(--mono);
+  font-size:0.65rem;letter-spacing:0.12em;
+  color:var(--text-dim);text-transform:uppercase;
+  margin-bottom:0.5rem;
+}
+.kpi-value{
+  font-size:clamp(1.4rem,2.5vw,2rem);
+  font-weight:800;color:var(--beige);
+  line-height:1;margin-bottom:0.3rem;
+}
+.kpi-value.accent{color:var(--accent)}
+.kpi-sub{font-size:0.75rem;color:var(--text-dim)}
+.kpi-badge{
+  display:inline-block;
+  background:rgba(90,190,138,0.12);
+  color:var(--green);
+  font-family:var(--mono);font-size:0.65rem;
+  padding:0.2rem 0.5rem;border-radius:3px;
+  margin-top:0.4rem;
+}
+.kpi-badge.red{background:rgba(224,90,90,0.12);color:var(--red)}
+.kpi-badge.amber{background:rgba(224,160,64,0.12);color:var(--amber)}
+
+/* MAIN GRID */
+.dashboard{
+  display:grid;
+  grid-template-columns:1.4fr 1fr;
+  grid-template-rows:auto auto;
+  gap:1px;
+  background:var(--border);
+  position:relative;z-index:1;
+}
+.panel{
+  background:var(--bg);
+  padding:1.75rem 2rem;
+  animation:fadeUp 0.8s 0.2s ease both;
+}
+.panel-full{grid-column:1/-1}
+.panel-title{
+  font-family:var(--mono);
+  font-size:0.68rem;letter-spacing:0.12em;
+  color:var(--accent2);text-transform:uppercase;
+  margin-bottom:1.25rem;
+  display:flex;align-items:center;gap:0.6rem;
+}
+.panel-title::before{
+  content:'';width:3px;height:14px;
+  background:var(--accent3);border-radius:2px;
+}
+
+/* CHARTS */
+.chart-area{position:relative;width:100%}
+canvas{display:block;width:100%!important}
+
+/* BAR CHART MANUAL */
+.bar-group{margin-bottom:0.6rem}
+.bar-row{display:flex;align-items:center;gap:0.75rem;margin-bottom:0.5rem}
+.bar-label{
+  font-family:var(--mono);font-size:0.65rem;
+  color:var(--text-dim);width:120px;flex-shrink:0;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.bar-track{flex:1;height:22px;background:var(--surface2);border-radius:3px;overflow:hidden;position:relative}
+.bar-fill{
+  height:100%;border-radius:3px;
+  display:flex;align-items:center;padding-left:8px;
+  font-family:var(--mono);font-size:0.6rem;color:rgba(255,255,255,0.7);
+  transition:width 1.5s cubic-bezier(0.16,1,0.3,1);
+  width:0;
+}
+
+/* LINE CHART */
+svg.line-chart{overflow:visible}
+.chart-tooltip{
+  position:absolute;
+  background:var(--surface2);
+  border:1px solid var(--border);
+  border-radius:6px;
+  padding:0.5rem 0.75rem;
+  font-family:var(--mono);font-size:0.65rem;
+  color:var(--text);
+  pointer-events:none;
+  opacity:0;
+  transition:opacity 0.15s;
+  white-space:nowrap;
+  z-index:10;
+}
+
+/* DONUT */
+.donut-wrap{display:flex;align-items:center;gap:2rem;flex-wrap:wrap}
+.donut-legend{display:flex;flex-direction:column;gap:0.5rem;flex:1}
+.legend-item{display:flex;align-items:center;gap:0.6rem;font-size:0.78rem;color:var(--text-dim)}
+.legend-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.legend-val{margin-left:auto;font-family:var(--mono);font-size:0.68rem;color:var(--text)}
+
+/* BOTTOM ROW */
+.bottom-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr;
+  gap:1px;
+  background:var(--border);
+  border-top:1px solid var(--border);
+  position:relative;z-index:1;
+}
+
+/* INSIGHT CARDS */
+.insight{
+  background:var(--bg);
+  padding:1.5rem 2rem;
+  animation:fadeUp 0.9s 0.3s ease both;
+}
+.insight-num{
+  font-size:2.2rem;font-weight:800;
+  line-height:1;margin-bottom:0.4rem;
+}
+.insight-label{font-size:0.8rem;color:var(--text-dim);line-height:1.5}
+
+/* FOOTER */
+footer{
+  padding:1rem 2.5rem;
+  border-top:1px solid var(--border);
+  display:flex;justify-content:space-between;align-items:center;
+  font-family:var(--mono);font-size:0.65rem;color:var(--text-dim);
+  position:relative;z-index:1;
+  flex-wrap:wrap;gap:0.5rem;
+}
+footer span{color:var(--accent)}
+
+/* ANIMATIONS */
+@keyframes fadeDown{from{opacity:0;transform:translateY(-16px)}to{opacity:1;transform:none}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.5;transform:scale(0.8)}}
+
+@media(max-width:768px){
+  .kpi-strip{grid-template-columns:1fr 1fr}
+  .kpi{border-right:none;border-bottom:1px solid var(--border)}
+  .dashboard{grid-template-columns:1fr}
+  .bottom-grid{grid-template-columns:1fr}
+  header{flex-direction:column}
+  .header-meta{align-items:flex-start}
+  .donut-wrap{flex-direction:column}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <div class="header-tag">// Portfolio Project · Data Analysis</div>
+    <h1>UK Crime <span>Analysis</span><br>Dashboard</h1>
+  </div>
+  <div class="header-meta">
+    <div class="live-dot">Data loaded</div>
+    <div>Source: UK Home Office Open Data</div>
+    <div>Period: 2012/13 — 2023/24</div>
+    <div>Analyst: <span style="color:var(--accent)">Success Azubuike</span></div>
+  </div>
+</header>
+
+<!-- KPI STRIP -->
+<div class="kpi-strip">
+  <div class="kpi">
+    <div class="kpi-label">Total Offences Recorded</div>
+    <div class="kpi-value accent" id="kpi-total">0</div>
+    <div class="kpi-sub">Across all force areas</div>
+    <div class="kpi-badge">2012–2024</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Peak Crime Year</div>
+    <div class="kpi-value">2022/23</div>
+    <div class="kpi-sub">6,736,588 offences</div>
+    <div class="kpi-badge red">↑ Highest on record</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Top Offence Category</div>
+    <div class="kpi-value" style="font-size:1.2rem;padding-top:0.2rem">Theft</div>
+    <div class="kpi-sub">20.05M offences total</div>
+    <div class="kpi-badge amber">33.7% of all crime</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Force Areas Covered</div>
+    <div class="kpi-value">48</div>
+    <div class="kpi-sub">Incl. Metropolitan Police</div>
+    <div class="kpi-badge">England & Wales</div>
+  </div>
+</div>
+
+<!-- MAIN DASHBOARD -->
+<div class="dashboard">
+
+  <!-- LINE: Offences by Year -->
+  <div class="panel">
+    <div class="panel-title">Offences by Financial Year</div>
+    <div class="chart-area" style="height:220px;position:relative">
+      <svg id="line-svg" class="line-chart" width="100%" height="220" viewBox="0 0 600 200" preserveAspectRatio="none"></svg>
+      <div class="chart-tooltip" id="tooltip"></div>
+    </div>
+    <div style="display:flex;gap:1.5rem;margin-top:1rem;font-family:var(--mono);font-size:0.65rem;color:var(--text-dim)">
+      <span style="color:var(--accent)">— Total offences</span>
+      <span>COVID dip visible 2020/21</span>
+      <span>2023/24 = partial year</span>
+    </div>
+  </div>
+
+  <!-- DONUT: Offence Groups -->
+  <div class="panel">
+    <div class="panel-title">Offence Group Breakdown</div>
+    <div class="donut-wrap">
+      <svg id="donut-svg" width="140" height="140" viewBox="0 0 140 140" style="flex-shrink:0"></svg>
+      <div class="donut-legend" id="donut-legend"></div>
+    </div>
+  </div>
+
+  <!-- BAR: Top Force Areas -->
+  <div class="panel">
+    <div class="panel-title">Top 8 Force Areas by Volume</div>
+    <div id="bar-chart"></div>
+  </div>
+
+  <!-- BAR: Quarterly -->
+  <div class="panel">
+    <div class="panel-title">Offences by Quarter (All Years)</div>
+    <div id="quarter-chart"></div>
+    <div style="font-family:var(--mono);font-size:0.65rem;color:var(--text-dim);margin-top:1rem">
+      Q1 = Apr–Jun &nbsp;·&nbsp; Q2 = Jul–Sep &nbsp;·&nbsp; Q3 = Oct–Dec &nbsp;·&nbsp; Q4 = Jan–Mar
+    </div>
+  </div>
+
+</div>
+
+<!-- BOTTOM INSIGHTS -->
+<div class="bottom-grid">
+  <div class="insight">
+    <div class="panel-title">Key Insight 01</div>
+    <div class="insight-num" style="color:var(--red)">+65.7%</div>
+    <div class="insight-label">Crime increase from 2012/13 to 2022/23 — a decade of rising recorded offences driven by improved reporting, digital fraud inclusion, and population growth.</div>
+  </div>
+  <div class="insight">
+    <div class="panel-title">Key Insight 02</div>
+    <div class="insight-num" style="color:var(--amber)">−19.3%</div>
+    <div class="insight-label">Drop in 2020/21 vs 2019/20 — clearly linked to COVID-19 lockdowns reducing opportunity for contact crimes like theft, robbery, and public order offences.</div>
+  </div>
+  <div class="insight">
+    <div class="panel-title">Key Insight 03</div>
+    <div class="insight-num" style="color:var(--accent)">Met</div>
+    <div class="insight-label">Metropolitan Police recorded 8.96M offences — the highest of any single force, representing ~14.7% of all recorded crime across England and Wales.</div>
+  </div>
+</div>
+
+<footer>
+  <div>Data: UK Home Office · Police Recorded Crime · Open Data Tables · Crown Copyright © 2023</div>
+  <div>Built by <span>Success Azubuike</span> · The Digital Sera · 2026</div>
+</footer>
+
+<script>
+// ── DATA ──────────────────────────────────────────────────────────────────────
+const yearData = [
+  {year:'2012/13', val:4063571},
+  {year:'2013/14', val:4028456},
+  {year:'2014/15', val:4167619},
+  {year:'2015/16', val:4515903},
+  {year:'2016/17', val:4970709},
+  {year:'2017/18', val:5528510},
+  {year:'2018/19', val:5964467},
+  {year:'2019/20', val:6078988},
+  {year:'2020/21', val:5434426},
+  {year:'2021/22', val:6343500},
+  {year:'2022/23', val:6736588},
+  {year:'2023/24', val:1689998},
+];
+
+const offenceGroups = [
+  {label:'Theft offences',      val:20054575, color:'#C4B5D9'},
+  {label:'Violence vs person',  val:15518807, color:'#E05A5A'},
+  {label:'Fraud offences',      val:8277914,  color:'#E0A040'},
+  {label:'Criminal damage',     val:6040678,  color:'#5A9BE0'},
+  {label:'Public order',        val:4029186,  color:'#5ABE8A'},
+  {label:'Drug offences',       val:1956510,  color:'#9B88BE'},
+  {label:'Sexual offences',     val:1502423,  color:'#E08A5A'},
+  {label:'Other',               val:2143060,  color:'#4A5068'},
+];
+
+const forceData = [
+  {name:'Metropolitan Police', val:8963486},
+  {name:'Cifas',               val:3308309},
+  {name:'Action Fraud',        val:3183118},
+  {name:'Greater Manchester',  val:3118837},
+  {name:'West Midlands',       val:2754099},
+  {name:'West Yorkshire',      val:2712121},
+  {name:'Kent',                val:1693152},
+  {name:'Thames Valley',       val:1684546},
+];
+
+const quarterData = [
+  {q:'Q1', val:16003855},
+  {q:'Q2', val:14739679},
+  {q:'Q3', val:14547477},
+  {q:'Q4', val:14231724},
+];
+
+// ── KPI COUNTER ──────────────────────────────────────────────────────────────
+function animateCount(el, target, duration=1800){
+  let start=0, startTime=null;
+  function step(ts){
+    if(!startTime) startTime=ts;
+    const progress=Math.min((ts-startTime)/duration,1);
+    const ease=1-Math.pow(1-progress,4);
+    el.textContent=Math.floor(ease*target).toLocaleString();
+    if(progress<1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+animateCount(document.getElementById('kpi-total'),59522735);
+
+// ── LINE CHART ────────────────────────────────────────────────────────────────
+(function(){
+  const svg=document.getElementById('line-svg');
+  const W=600,H=200,pad={t:20,r:20,b:40,l:60};
+  const iW=W-pad.l-pad.r, iH=H-pad.t-pad.b;
+  // exclude 2023/24 partial for scale
+  const vals=yearData.map(d=>d.val);
+  const maxV=Math.max(...vals), minV=Math.min(...vals);
+  const scaleX=i=>(pad.l + i*(iW/(yearData.length-1)));
+  const scaleY=v=>(pad.t + iH - ((v-minV)/(maxV-minV))*iH);
+
+  // Grid lines
+  [0,0.25,0.5,0.75,1].forEach(t=>{
+    const y=pad.t+iH*(1-t);
+    const val=Math.round(minV+t*(maxV-minV));
+    const line=document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1',pad.l);line.setAttribute('x2',W-pad.r);
+    line.setAttribute('y1',y);line.setAttribute('y2',y);
+    line.setAttribute('stroke','#252A38');line.setAttribute('stroke-width','1');
+    svg.appendChild(line);
+    const text=document.createElementNS('http://www.w3.org/2000/svg','text');
+    text.setAttribute('x',pad.l-6);text.setAttribute('y',y+4);
+    text.setAttribute('text-anchor','end');text.setAttribute('fill','#8A8278');
+    text.setAttribute('font-size','9');text.setAttribute('font-family','Space Mono');
+    text.textContent=(val/1e6).toFixed(1)+'M';
+    svg.appendChild(text);
+  });
+
+  // Area fill
+  const aPoints=yearData.map((d,i)=>`${scaleX(i)},${scaleY(d.val)}`).join(' ');
+  const area=document.createElementNS('http://www.w3.org/2000/svg','polygon');
+  area.setAttribute('points',`${pad.l},${pad.t+iH} ${aPoints} ${scaleX(yearData.length-1)},${pad.t+iH}`);
+  area.setAttribute('fill','rgba(107,90,154,0.12)');
+  svg.appendChild(area);
+
+  // Line path
+  const pts=yearData.map((d,i)=>`${i===0?'M':'L'}${scaleX(i)},${scaleY(d.val)}`).join(' ');
+  const path=document.createElementNS('http://www.w3.org/2000/svg','path');
+  path.setAttribute('d',pts);
+  path.setAttribute('fill','none');
+  path.setAttribute('stroke','#C4B5D9');
+  path.setAttribute('stroke-width','2');
+  const len=path.getTotalLength?path.getTotalLength():1000;
+  path.style.strokeDasharray=len;
+  path.style.strokeDashoffset=len;
+  path.style.transition='stroke-dashoffset 2s cubic-bezier(0.16,1,0.3,1)';
+  svg.appendChild(path);
+  setTimeout(()=>{path.style.strokeDashoffset=0},100);
+
+  // COVID annotation
+  const covidX=scaleX(8), covidY1=scaleY(5434426), covidY2=pad.t;
+  const ann=document.createElementNS('http://www.w3.org/2000/svg','line');
+  ann.setAttribute('x1',covidX);ann.setAttribute('x2',covidX);
+  ann.setAttribute('y1',covidY1);ann.setAttribute('y2',covidY2+5);
+  ann.setAttribute('stroke','rgba(224,90,90,0.4)');ann.setAttribute('stroke-width','1');ann.setAttribute('stroke-dasharray','3,3');
+  svg.appendChild(ann);
+  const annT=document.createElementNS('http://www.w3.org/2000/svg','text');
+  annT.setAttribute('x',covidX+4);annT.setAttribute('y',covidY2+14);
+  annT.setAttribute('fill','rgba(224,90,90,0.7)');annT.setAttribute('font-size','8');annT.setAttribute('font-family','Space Mono');
+  annT.textContent='COVID';svg.appendChild(annT);
+
+  // Dots + tooltip
+  const tooltip=document.getElementById('tooltip');
+  yearData.forEach((d,i)=>{
+    const cx=scaleX(i), cy=scaleY(d.val);
+    const dot=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    dot.setAttribute('cx',cx);dot.setAttribute('cy',cy);dot.setAttribute('r','4');
+    dot.setAttribute('fill',d.year==='2022/23'?'#E05A5A':'#C4B5D9');
+    dot.setAttribute('stroke','#0D0F14');dot.setAttribute('stroke-width','2');
+    dot.style.cursor='pointer';
+    dot.addEventListener('mouseenter',e=>{
+      tooltip.style.opacity='1';
+      tooltip.innerHTML=`<b>${d.year}</b><br>${d.val.toLocaleString()} offences`;
+    });
+    dot.addEventListener('mouseleave',()=>{tooltip.style.opacity='0'});
+    svg.appendChild(dot);
+    // X labels
+    if(i%2===0||i===yearData.length-1){
+      const lbl=document.createElementNS('http://www.w3.org/2000/svg','text');
+      lbl.setAttribute('x',cx);lbl.setAttribute('y',H-pad.b+16);
+      lbl.setAttribute('text-anchor','middle');lbl.setAttribute('fill','#8A8278');
+      lbl.setAttribute('font-size','8');lbl.setAttribute('font-family','Space Mono');
+      lbl.textContent=d.year.slice(2);svg.appendChild(lbl);
+    }
+  });
+
+  // Tooltip position
+  svg.addEventListener('mousemove',e=>{
+    const r=svg.getBoundingClientRect();
+    tooltip.style.left=(e.clientX-r.left+12)+'px';
+    tooltip.style.top=(e.clientY-r.top-30)+'px';
+  });
+})();
+
+// ── DONUT CHART ───────────────────────────────────────────────────────────────
+(function(){
+  const svg=document.getElementById('donut-svg');
+  const legend=document.getElementById('donut-legend');
+  const total=offenceGroups.reduce((s,d)=>s+d.val,0);
+  const cx=70,cy=70,R=58,r=36;
+  let startAngle=-Math.PI/2;
+
+  offenceGroups.forEach(d=>{
+    const angle=(d.val/total)*2*Math.PI;
+    const endAngle=startAngle+angle;
+    const x1=cx+R*Math.cos(startAngle),y1=cy+R*Math.sin(startAngle);
+    const x2=cx+R*Math.cos(endAngle),y2=cy+R*Math.sin(endAngle);
+    const x3=cx+r*Math.cos(endAngle),y3=cy+r*Math.sin(endAngle);
+    const x4=cx+r*Math.cos(startAngle),y4=cy+r*Math.sin(startAngle);
+    const large=angle>Math.PI?1:0;
+    const path=document.createElementNS('http://www.w3.org/2000/svg','path');
+    path.setAttribute('d',`M${x1},${y1} A${R},${R} 0 ${large},1 ${x2},${y2} L${x3},${y3} A${r},${r} 0 ${large},0 ${x4},${y4} Z`);
+    path.setAttribute('fill',d.color);
+    path.setAttribute('stroke','#0D0F14');path.setAttribute('stroke-width','2');
+    path.style.transition='opacity 0.2s';
+    path.addEventListener('mouseenter',()=>{path.style.opacity='0.75'});
+    path.addEventListener('mouseleave',()=>{path.style.opacity='1'});
+    svg.appendChild(path);
+    startAngle=endAngle;
+
+    // Legend
+    const item=document.createElement('div');
+    item.className='legend-item';
+    const pct=((d.val/total)*100).toFixed(1);
+    item.innerHTML=`<span class="legend-dot" style="background:${d.color}"></span><span>${d.label}</span><span class="legend-val">${pct}%</span>`;
+    legend.appendChild(item);
+  });
+
+  // Centre text
+  const t1=document.createElementNS('http://www.w3.org/2000/svg','text');
+  t1.setAttribute('x',cx);t1.setAttribute('y',cy-4);
+  t1.setAttribute('text-anchor','middle');t1.setAttribute('fill','#F5F0E8');
+  t1.setAttribute('font-size','11');t1.setAttribute('font-family','Syne');t1.setAttribute('font-weight','700');
+  t1.textContent='59.5M';svg.appendChild(t1);
+  const t2=document.createElementNS('http://www.w3.org/2000/svg','text');
+  t2.setAttribute('x',cx);t2.setAttribute('y',cy+10);
+  t2.setAttribute('text-anchor','middle');t2.setAttribute('fill','#8A8278');
+  t2.setAttribute('font-size','7.5');t2.setAttribute('font-family','Space Mono');
+  t2.textContent='offences';svg.appendChild(t2);
+})();
+
+// ── BAR CHART (Force Areas) ───────────────────────────────────────────────────
+(function(){
+  const container=document.getElementById('bar-chart');
+  const maxVal=forceData[0].val;
+  const colors=['#C4B5D9','#9B88BE','#7B6AAE','#6B5A9A','#5A9BE0','#5ABE8A','#E0A040','#4A5068'];
+  forceData.forEach((d,i)=>{
+    const pct=(d.val/maxVal)*100;
+    const row=document.createElement('div');
+    row.className='bar-row';
+    row.innerHTML=`
+      <div class="bar-label" title="${d.name}">${d.name}</div>
+      <div class="bar-track">
+        <div class="bar-fill" style="background:${colors[i]};width:0%" data-pct="${pct}">
+          ${(d.val/1e6).toFixed(1)}M
+        </div>
+      </div>`;
+    container.appendChild(row);
+  });
+  setTimeout(()=>{
+    document.querySelectorAll('.bar-fill').forEach(el=>{
+      el.style.width=el.dataset.pct+'%';
+    });
+  },200);
+})();
+
+// ── QUARTER CHART ─────────────────────────────────────────────────────────────
+(function(){
+  const container=document.getElementById('quarter-chart');
+  const maxVal=Math.max(...quarterData.map(d=>d.val));
+  const colors=['#C4B5D9','#9B88BE','#7B6AAE','#6B5A9A'];
+  quarterData.forEach((d,i)=>{
+    const pct=(d.val/maxVal)*100;
+    const row=document.createElement('div');
+    row.className='bar-row';
+    row.innerHTML=`
+      <div class="bar-label" style="width:30px">${d.q}</div>
+      <div class="bar-track">
+        <div class="bar-fill" style="background:${colors[i]};width:0%" data-pct="${pct}">
+          ${(d.val/1e6).toFixed(1)}M
+        </div>
+      </div>`;
+    container.appendChild(row);
+  });
+  setTimeout(()=>{
+    document.querySelectorAll('#quarter-chart .bar-fill').forEach(el=>{
+      el.style.width=el.dataset.pct+'%';
+    });
+  },400);
+})();
+</script>
+</body>
+</html>
